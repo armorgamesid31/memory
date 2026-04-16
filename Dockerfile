@@ -21,8 +21,8 @@ RUN npm install
 # Copy source
 COPY . .
 
-# Build app
-RUN npm run build
+# Build app with higher memory limit to avoid OOM
+RUN NODE_OPTIONS="--max-old-space-size=2048" npm run build
 
 # Expose ports
 EXPOSE 3111 3112 3113

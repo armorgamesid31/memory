@@ -86,6 +86,21 @@ export function startViewerServer(
       return;
     }
 
+    if (secret) {
+      const auth = req.headers.authorization;
+      const expected = `Basic ${Buffer.from(`admin:${secret}`).toString("base64")}`;
+      const isBearer = auth === `Bearer ${secret}`;
+
+      if (auth !== expected && !isBearer) {
+        res.writeHead(401, {
+          "WWW-Authenticate": 'Basic realm="agentmemory"',
+          "Content-Type": "text/plain",
+        });
+        res.end("Unauthorized");
+        return;
+      }
+    }
+
     if (
       method === "GET" &&
       (pathname === "/" ||
