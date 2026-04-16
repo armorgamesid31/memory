@@ -86,6 +86,12 @@ export function startViewerServer(
       return;
     }
 
+    if (pathname === "/health") {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("OK");
+      return;
+    }
+
     if (secret) {
       const auth = req.headers.authorization;
       const expected = `Basic ${Buffer.from(`admin:${secret}`).toString("base64")}`;
