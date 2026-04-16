@@ -15,12 +15,15 @@ const ALLOWED_ORIGINS = (
 
 function corsHeaders(req: IncomingMessage): Record<string, string> {
   const origin = req.headers.origin || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin)
-    ? origin
-    : ALLOWED_ORIGINS[0];
+  const isWildcard = ALLOWED_ORIGINS.includes("*");
+  const allowed = isWildcard
+    ? origin || "*"
+    : ALLOWED_ORIGINS.includes(origin)
+      ? origin
+      : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS, PUT, PATCH",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     Vary: "Origin",
   };
@@ -139,7 +142,7 @@ async function proxyToRestApi(
     ? pathname
     : `/agentmemory${pathname.startsWith("/") ? pathname : "/" + pathname}`;
 
-  const upstreamUrl = `http://127.0.0.1:${restPort}${upstreamPath}${qs ? "?" + qs : ""}`;
+  const upstreamUrl = `http://localhost:${restPort}${upstreamPath}${qs ? "?" + qs : ""}`;
 
   const headers: Record<string, string> = {};
   if (secret) {

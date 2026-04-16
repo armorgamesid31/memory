@@ -805,7 +805,7 @@
     var viewerPort = params.get('port') || window.location.port || '3113';
     var iiiPort = parseInt(viewerPort);
     if (iiiPort === 3111) viewerPort = '3113';
-    var REST = window.location.protocol + '//' + window.location.hostname + ':' + viewerPort;
+    var REST = window.location.origin;
     var wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     var wsPort = params.get('wsPort') || String(parseInt(viewerPort) - 1);
     var WS_URL = wsProto + '//' + window.location.hostname + ':' + wsPort;

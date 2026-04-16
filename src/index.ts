@@ -317,9 +317,8 @@ async function main() {
     `[agentmemory] Endpoints: 103 REST + 43 MCP tools + 6 MCP resources + 3 MCP prompts`,
   );
 
-  const viewerPort = config.restPort + 2;
   const viewerServer = startViewerServer(
-    viewerPort,
+    config.viewerPort,
     kv,
     sdk,
     secret,
