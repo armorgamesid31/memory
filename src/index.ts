@@ -323,6 +323,7 @@ async function main() {
     sdk,
     secret,
     config.restPort,
+    config.streamsPort,
   );
 
   const autoForgetIntervalMs = parseInt(process.env.AUTO_FORGET_INTERVAL_MS || "3600000", 10);

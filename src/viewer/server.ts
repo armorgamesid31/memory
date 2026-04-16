@@ -4,6 +4,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
+import * as net from "node:net";
 import { renderViewerDocument } from "./document.js";
 
 const ALLOWED_ORIGINS = (
@@ -67,8 +68,10 @@ export function startViewerServer(
   _sdk: unknown,
   secret?: string,
   restPort?: number,
+  streamsPort?: number,
 ): Server {
   const resolvedRestPort = restPort ?? port - 2;
+  const resolvedStreamsPort = streamsPort ?? port - 1;
 
   const server = createServer(async (req, res) => {
     const raw = req.url || "/";
@@ -132,6 +135,30 @@ export function startViewerServer(
     } catch (err) {
       console.error(`[viewer] proxy error on ${method} ${pathname}:`, err);
       json(res, 502, { error: "upstream error" }, req);
+    }
+  });
+
+  server.on("upgrade", (req, socket, head) => {
+    const raw = req.url || "/";
+    const qIdx = raw.indexOf("?");
+    const pathname = qIdx >= 0 ? raw.slice(0, qIdx) : raw;
+
+    if (pathname === "/agentmemory/streams" || pathname === "/agentmemory/ws") {
+      const proxy = net.connect(resolvedStreamsPort, "localhost", () => {
+        proxy.write(head);
+        socket.pipe(proxy).pipe(socket);
+      });
+
+      proxy.on("error", (err) => {
+        console.warn(`[agentmemory] WS Proxy error:`, err.message);
+        socket.destroy();
+      });
+
+      socket.on("error", () => {
+        proxy.destroy();
+      });
+    } else {
+      socket.destroy();
     }
   });
 

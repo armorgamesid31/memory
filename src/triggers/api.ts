@@ -710,6 +710,20 @@ export function registerApiTriggers(
     config: { api_path: "/agentmemory/relations", http_method: "POST" },
   });
 
+  sdk.registerFunction("api::relations-list", 
+    async (req: ApiRequest): Promise<Response> => {
+      const authErr = checkAuth(req, secret);
+      if (authErr) return authErr;
+      const relations = await kv.list<import("../types.js").MemoryRelation>(KV.relations);
+      return { status_code: 200, body: { relations } };
+    },
+  );
+  sdk.registerTrigger({
+    type: "http",
+    function_id: "api::relations-list",
+    config: { api_path: "/agentmemory/relations", http_method: "GET" },
+  });
+
   sdk.registerFunction("api::evolve", 
     async (
       req: ApiRequest<{
@@ -761,8 +775,8 @@ export function registerApiTriggers(
         return { status_code: 200, body: result };
       } catch {
         return {
-          status_code: 404,
-          body: { error: "Claude bridge not enabled" },
+          status_code: 200,
+          body: { enabled: false, error: "Claude bridge not enabled" },
         };
       }
     },
@@ -782,8 +796,8 @@ export function registerApiTriggers(
         return { status_code: 200, body: result };
       } catch {
         return {
-          status_code: 404,
-          body: { error: "Claude bridge not enabled" },
+          status_code: 200,
+          body: { success: false, enabled: false, error: "Claude bridge not enabled" },
         };
       }
     },
@@ -1105,6 +1119,34 @@ export function registerApiTriggers(
     type: "http",
     function_id: "api::memories",
     config: { api_path: "/agentmemory/memories", http_method: "GET" },
+  });
+
+  sdk.registerFunction("api::semantic", 
+    async (req: ApiRequest): Promise<Response> => {
+      const authErr = checkAuth(req, secret);
+      if (authErr) return authErr;
+      const semantic = await kv.list<import("../types.js").SemanticMemory>(KV.semantic);
+      return { status_code: 200, body: { semantic } };
+    },
+  );
+  sdk.registerTrigger({
+    type: "http",
+    function_id: "api::semantic",
+    config: { api_path: "/agentmemory/semantic", http_method: "GET" },
+  });
+
+  sdk.registerFunction("api::procedural", 
+    async (req: ApiRequest): Promise<Response> => {
+      const authErr = checkAuth(req, secret);
+      if (authErr) return authErr;
+      const procedural = await kv.list<import("../types.js").ProceduralMemory>(KV.procedural);
+      return { status_code: 200, body: { procedural } };
+    },
+  );
+  sdk.registerTrigger({
+    type: "http",
+    function_id: "api::procedural",
+    config: { api_path: "/agentmemory/procedural", http_method: "GET" },
   });
 
   sdk.registerFunction("api::action-create", 

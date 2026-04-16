@@ -807,9 +807,9 @@
     if (iiiPort === 3111) viewerPort = '3113';
     var REST = window.location.origin;
     var wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var wsPort = params.get('wsPort') || String(parseInt(viewerPort) - 1);
-    var WS_URL = wsProto + '//' + window.location.hostname + ':' + wsPort;
-    var WS_DIRECT_URL = wsProto + '//' + window.location.hostname + ':' + wsPort + '/stream/mem-live/viewer';
+    var wsUrl = wsProto + '//' + window.location.host + '/agentmemory/streams';
+    var WS_URL = wsUrl;
+    var WS_DIRECT_URL = wsUrl;
 
     var dateEl = document.getElementById('dateline');
     if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
