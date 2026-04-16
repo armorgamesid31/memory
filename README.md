@@ -843,4 +843,4 @@ npm run test:integration  # API tests (requires running services)
 
 [Apache-2.0](LICENSE)
 
-<!-- heartbeat: 2026-04-17 -->
+<!-- heartbeat: 2026-04-17 (armorgamesid31) -->
