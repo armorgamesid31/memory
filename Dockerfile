@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib
 RUN curl -fsSL https://install.iii.dev/iii/main/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
+# Increase Node.js memory limit to 512MB
+ENV NODE_OPTIONS="--max-old-space-size=512"
+
 # Copy package config
 COPY package*.json ./
 
