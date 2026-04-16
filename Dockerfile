@@ -3,7 +3,7 @@ FROM node:20-slim
 WORKDIR /app
 
 # Install dependencies for iii-engine (curl, ca-certificates, etc)
-RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl wget ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install iii-engine
 RUN curl -fsSL https://install.iii.dev/iii/main/install.sh | sh
