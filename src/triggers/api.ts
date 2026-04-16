@@ -112,6 +112,20 @@ export function registerApiTriggers(
     config: { api_path: "/agentmemory/livez", http_method: "GET" },
   });
 
+  sdk.registerFunction(
+    "api::favicon",
+    async (): Promise<Response> => ({
+      status_code: 204,
+      headers: { "Content-Type": "image/x-icon" },
+      body: "",
+    }),
+  );
+  sdk.registerTrigger({
+    type: "http",
+    function_id: "api::favicon",
+    config: { api_path: "/favicon.ico", http_method: "GET" },
+  });
+
   sdk.registerFunction("api::health", 
     async (req: ApiRequest): Promise<Response> => {
       const health = await getLatestHealth(kv);
@@ -827,8 +841,15 @@ export function registerApiTriggers(
         return { status_code: 200, body: result };
       } catch {
         return {
-          status_code: 404,
-          body: { error: "Knowledge graph not enabled" },
+          status_code: 200,
+          body: {
+            nodes: [],
+            edges: [],
+            totalNodes: 0,
+            totalEdges: 0,
+            hasMore: false,
+            enabled: false,
+          },
         };
       }
     },
@@ -848,8 +869,14 @@ export function registerApiTriggers(
         return { status_code: 200, body: result };
       } catch {
         return {
-          status_code: 404,
-          body: { error: "Knowledge graph not enabled" },
+          status_code: 200,
+          body: {
+            nodes: 0,
+            edges: 0,
+            nodeTypes: {},
+            edgeTypes: {},
+            enabled: false,
+          },
         };
       }
     },
@@ -858,6 +885,28 @@ export function registerApiTriggers(
     type: "http",
     function_id: "api::graph-stats",
     config: { api_path: "/agentmemory/graph/stats", http_method: "GET" },
+  });
+
+  sdk.registerFunction("api::graph-build", 
+    async (req: ApiRequest): Promise<Response> => {
+      const authErr = checkAuth(req, secret);
+      if (authErr) return authErr;
+      return {
+        status_code: 200,
+        body: {
+          success: false,
+          nodes: 0,
+          edges: 0,
+          message: "Knowledge graph build is unavailable when extraction is disabled",
+          enabled: false,
+        },
+      };
+    },
+  );
+  sdk.registerTrigger({
+    type: "http",
+    function_id: "api::graph-build",
+    config: { api_path: "/agentmemory/graph/build", http_method: "POST" },
   });
 
   sdk.registerFunction("api::graph-extract", 
