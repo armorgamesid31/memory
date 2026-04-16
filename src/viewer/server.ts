@@ -93,7 +93,6 @@ export function startViewerServer(
       if (rendered.found) {
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
-          "Content-Security-Policy": rendered.csp,
           "Cache-Control": "no-cache",
         });
         res.end(rendered.html);
@@ -120,7 +119,7 @@ export function startViewerServer(
     }
   });
 
-  server.listen(port, "127.0.0.1", () => {
+  server.listen(port, "0.0.0.0", () => {
     console.log(`[agentmemory] Viewer: http://localhost:${port}`);
   });
 
