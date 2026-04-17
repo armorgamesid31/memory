@@ -124,19 +124,17 @@ export function registerObserveFunction(
           action: TriggerAction.Void(),
         });
 
-        const session = await kv.get<{ observationCount?: number }>(
+        const session = await kv.get<Record<string, unknown>>(
           KV.sessions,
           payload.sessionId,
         );
         if (session) {
-          await kv.update(KV.sessions, payload.sessionId, [
-            { type: "set", path: "updatedAt", value: new Date().toISOString() },
-            {
-              type: "set",
-              path: "observationCount",
-              value: (session.observationCount || 0) + 1,
-            },
-          ]);
+          const updatedSession = {
+            ...session,
+            updatedAt: new Date().toISOString(),
+            observationCount: ((session.observationCount as number) || 0) + 1,
+          };
+          await kv.set(KV.sessions, payload.sessionId, updatedSession);
         }
 
         // Per-observation LLM compression is opt-in as of 0.8.8 (#138).
