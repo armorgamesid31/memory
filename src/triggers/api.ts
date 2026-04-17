@@ -891,16 +891,54 @@ export function registerApiTriggers(
     async (req: ApiRequest): Promise<Response> => {
       const authErr = checkAuth(req, secret);
       if (authErr) return authErr;
-      return {
-        status_code: 200,
-        body: {
-          success: false,
-          nodes: 0,
-          edges: 0,
-          message: "Knowledge graph build is unavailable when extraction is disabled",
-          enabled: false,
-        },
-      };
+
+      if (!isGraphExtractionEnabled()) {
+        return {
+          status_code: 200,
+          body: {
+            success: false,
+            message: "Knowledge graph build is unavailable when extraction is disabled",
+          },
+        };
+      }
+
+      const limit = Number(req.query.limit) || 100;
+      const observations = await kv.list<Observation>(KV.observations);
+      const recent = observations
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limit);
+
+      if (recent.length === 0) {
+        return {
+          status_code: 200,
+          body: {
+            success: false,
+            message: "No observations found to build graph from",
+          },
+        };
+      }
+
+      try {
+        const result = await sdk.trigger({
+          function_id: "mem::graph-extract",
+          payload: { observations: recent },
+        }) as { success: boolean; nodesAdded: number; edgesAdded: number };
+
+        return {
+          status_code: 200,
+          body: {
+            success: result.success,
+            nodes: result.nodesAdded || 0,
+            edges: result.edgesAdded || 0,
+            message: result.success ? "Graph updated successfully" : "Graph extraction failed",
+          },
+        };
+      } catch (err) {
+        return {
+          status_code: 500,
+          body: { success: false, error: String(err) },
+        };
+      }
     },
   );
   sdk.registerTrigger({
