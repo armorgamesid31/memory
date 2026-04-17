@@ -1,5 +1,10 @@
 import type { ISdk, ApiRequest } from "iii-sdk";
-import type { Session, CompressedObservation, HookPayload } from "../types.js";
+import type {
+  Session,
+  CompressedObservation,
+  HookPayload,
+  TopicSessionRoute,
+} from "../types.js";
 import { KV } from "../state/schema.js";
 import { StateKV } from "../state/kv.js";
 import { getLatestHealth } from "../health/monitor.js";
@@ -70,6 +75,37 @@ function parseOptionalPositiveInt(value: unknown): number | undefined | null {
   if (parsed === undefined || parsed === null) return parsed;
   if (!Number.isInteger(parsed) || parsed < 1) return null;
   return parsed;
+}
+
+const AUTO_TOPIC_SESSIONS =
+  process.env["AGENTMEMORY_AUTO_TOPIC_SESSIONS"] !== "false";
+
+function extractTopicTitle(prompt: string): string | null {
+  const lines = prompt
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return null;
+  const first = lines[0];
+  const headingMatch = first.match(/^#{1,6}\s+(.{2,200})$/);
+  if (headingMatch?.[1]) return headingMatch[1].trim();
+  const labelMatch = first.match(/^(topic|konu|başlık|baslik)\s*:\s*(.+)$/i);
+  if (labelMatch?.[2]) return labelMatch[2].trim();
+  return null;
+}
+
+function topicSlug(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return slug || "topic";
+}
+
+function autoTopicSessionId(baseSessionId: string, topicTitle: string): string {
+  const suffix = Date.now().toString(36);
+  return `${baseSessionId}__topic__${topicSlug(topicTitle)}__${suffix}`;
 }
 
 export function registerApiTriggers(
@@ -176,9 +212,69 @@ export function registerApiTriggers(
           },
         };
       }
+      let effectiveSessionId = sessionId;
+      if (AUTO_TOPIC_SESSIONS && sessionId !== "unknown") {
+        const now = new Date().toISOString();
+        let route = await kv
+          .get<TopicSessionRoute>(KV.topicSessions, sessionId)
+          .catch(() => null);
+        const prompt =
+          typeof body.data === "object" &&
+          body.data !== null &&
+          typeof (body.data as Record<string, unknown>)["prompt"] === "string"
+            ? ((body.data as Record<string, unknown>)["prompt"] as string)
+            : "";
+        const topicTitle =
+          hookType === "prompt_submit" && prompt ? extractTopicTitle(prompt) : null;
+
+        if (topicTitle && (!route || route.topicTitle !== topicTitle)) {
+          if (route?.activeSessionId && route.activeSessionId !== sessionId) {
+            await kv
+              .update(KV.sessions, route.activeSessionId, [
+                { type: "set", path: "endedAt", value: now },
+                { type: "set", path: "status", value: "completed" },
+              ])
+              .catch(() => undefined);
+          }
+
+          const topicSessionId = autoTopicSessionId(sessionId, topicTitle);
+          const topicSession: Session = {
+            id: topicSessionId,
+            project,
+            cwd,
+            startedAt: now,
+            status: "active",
+            observationCount: 0,
+            tags: ["auto_topic", topicTitle],
+          };
+          await kv.set(KV.sessions, topicSessionId, topicSession);
+
+          route = {
+            baseSessionId: sessionId,
+            activeSessionId: topicSessionId,
+            topicTitle,
+            project,
+            cwd,
+            createdAt: now,
+            updatedAt: now,
+          };
+          await kv.set(KV.topicSessions, sessionId, route);
+          effectiveSessionId = topicSessionId;
+        } else if (route?.activeSessionId) {
+          effectiveSessionId = route.activeSessionId;
+          if (route.updatedAt !== now) {
+            await kv
+              .update(KV.topicSessions, sessionId, [
+                { type: "set", path: "updatedAt", value: now },
+              ])
+              .catch(() => undefined);
+          }
+        }
+      }
+
       const payload: HookPayload = {
         hookType: hookType as HookPayload["hookType"],
-        sessionId,
+        sessionId: effectiveSessionId,
         project,
         cwd,
         timestamp,
@@ -302,6 +398,7 @@ export function registerApiTriggers(
         observationCount: 0,
       };
       await kv.set(KV.sessions, sessionId, session);
+      await kv.delete(KV.topicSessions, sessionId).catch(() => undefined);
       const contextResult = await sdk.trigger<
         { sessionId: string; project: string },
         { context: string }
@@ -330,6 +427,20 @@ export function registerApiTriggers(
           status_code: 400,
           body: { error: "sessionId is required and must be a non-empty string" },
         };
+      }
+      if (AUTO_TOPIC_SESSIONS) {
+        const route = await kv
+          .get<TopicSessionRoute>(KV.topicSessions, sessionId)
+          .catch(() => null);
+        if (route?.activeSessionId && route.activeSessionId !== sessionId) {
+          await kv
+            .update(KV.sessions, route.activeSessionId, [
+              { type: "set", path: "endedAt", value: new Date().toISOString() },
+              { type: "set", path: "status", value: "completed" },
+            ])
+            .catch(() => undefined);
+        }
+        await kv.delete(KV.topicSessions, sessionId).catch(() => undefined);
       }
       await kv.update(KV.sessions, sessionId, [
         { type: "set", path: "endedAt", value: new Date().toISOString() },
@@ -2145,6 +2256,22 @@ export function registerApiTriggers(
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::lesson-strengthen", config: { api_path: "/agentmemory/lessons/strengthen", http_method: "POST" } });
+
+  sdk.registerFunction("api::lesson-bulk-delete", async (req: ApiRequest) => {
+    const denied = checkAuth(req, secret);
+    if (denied) return denied;
+    const body = (req.body as Record<string, unknown>) || {};
+    const lessonIds = Array.isArray(body.lessonIds) ? body.lessonIds as string[] : undefined;
+    const deleteAll = body.deleteAll === true;
+    if (!deleteAll && (!lessonIds || lessonIds.length === 0)) {
+      return { status_code: 400, body: { error: "lessonIds array or deleteAll:true is required" } };
+    }
+    const result = await sdk.trigger({ function_id: "mem::lesson-bulk-delete", payload: { lessonIds, deleteAll } });
+    return { status_code: 200, body: result };
+  });
+  sdk.registerTrigger({ type: "http", function_id: "api::lesson-bulk-delete", config: { api_path: "/agentmemory/lessons", http_method: "DELETE" } });
+
+
 
   sdk.registerFunction("api::obsidian-export", async (req: ApiRequest) => {
     const denied = checkAuth(req, secret);

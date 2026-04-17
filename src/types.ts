@@ -109,6 +109,16 @@ export interface HookPayload {
   data: unknown;
 }
 
+export interface TopicSessionRoute {
+  baseSessionId: string;
+  activeSessionId: string;
+  topicTitle: string;
+  project: string;
+  cwd: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProviderConfig {
   provider: ProviderType;
   model: string;
