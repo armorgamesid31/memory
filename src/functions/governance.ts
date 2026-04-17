@@ -162,7 +162,8 @@ export function registerGovernanceFunction(sdk: ISdk, kv: StateKV): void {
       dateTo?: string;
       limit?: number;
     }) => {
-      return queryAudit(kv, data);
+      const entries = await queryAudit(kv, data);
+      return { success: true, entries };
     },
   );
 }
