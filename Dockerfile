@@ -9,14 +9,11 @@ RUN apt-get update && apt-get install -y curl wget ca-certificates && rm -rf /va
 RUN curl -fsSL https://install.iii.dev/iii/main/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Increase Node.js memory limit to 512MB
-ENV NODE_OPTIONS="--max-old-space-size=512"
-
 # Copy package config
 COPY package*.json ./
 
-# Install app deps
-RUN npm install
+# Install app deps deterministically with higher memory to avoid OOM kills.
+RUN NODE_OPTIONS="--max-old-space-size=2048" npm ci --no-audit --no-fund
 
 # Copy source
 COPY . .
